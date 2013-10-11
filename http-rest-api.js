@@ -59,8 +59,12 @@ app.configure(function() {
   app.use(express.bodyParser());
   app.use(expressValidator());
   app.use(express.methodOverride());
+  app.user(function(req, res, next){
+    // check the api-key header
+    if(!req.get('API-Key')) return res.json(401, {'API-Key not found'})
+    return next();
+  });
   app.use(app.router);
-
 });
 
 /**
@@ -72,22 +76,9 @@ server.listen(app.get("port"), function() {
 
 /**
  * HTTP Notifications API
- * All requests to the API should provide a `sessionID`
+ * All requests to the API should provide a `api-key` header
  *  to run the query in the context of a user.
  */
-app.param('sessionID', function(req, res, next, id) {
-  // hit redis for the session
-  redisSessionClient.get(id, function(err, session) {
-    // reply is null when the key is missing
-    if (!session) {
-      // send them an error
-      return res.json(401, {
-        msg: "Session not found for sessionID: " + id
-      });
-    }
-    req.session = session;
-  });
-});
 
 /**
  * Handle create Notification requests to the API.
@@ -161,7 +152,7 @@ app.get('/notifications', function(req, res, next) {
 
   if (!res.session) {
     return res.json(401, {
-      msg: "No session found."
+      message: "No session found."
     });
   }
 
@@ -194,7 +185,7 @@ app.get('/notifications', function(req, res, next) {
  * @param  {Object}   res  The response object express provides.
  * @param  {Function} next An optional callback to the next middleware.
  *
- * @returns {JSON} Sends back the Notifications for the given user in the response.
+ * @returns {JSON} Sends back the number of rows deleted in the response.
  */
 app.delete('/notifications/:id', function(req, res, next) {
   // TODO: determine proper validations for this resource
@@ -220,18 +211,20 @@ app.delete('/notifications/:id', function(req, res, next) {
  * @param  {Object}   res  The response object express provides.
  * @param  {Function} next An optional callback to the next middleware.
  *
- * @returns {JSON} Sends back the Notifications matching the given id in the response.
+ * @returns {JSON} Sends back the number of Notifications updated in the response.
  */
 app.put('/notifications/:id', function(req, res, next) {
   // TODO: determine proper validations for this resource
+  //  a proper `PUT` would require all the params to be set,
+  //  this resource acts more like a `PATCH`.
 
   // get the object based on the id
   var n = new Notification(req.body);
-  n.get(req.param('id'), function(err, results) {
+  n.get(req.param('id'), function(err, count) {
     if (err) return next(err);
 
     return res.json({
-      results: results
+      count: count
     })
   });
 });
