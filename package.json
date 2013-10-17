@@ -26,5 +26,12 @@
   "repository": {
     "type": "git",
     "url": "git@github.com:nickpoorman/kdev.git"
+  },
+  "devDependencies": {
+    "optimist": "~0.6.0",
+    "supertest": "~0.8.0",
+    "should": "~2.0.1",
+    "redis": "~0.8.6",
+    "mysql": "~2.0.0-alpha9"
   }
 }

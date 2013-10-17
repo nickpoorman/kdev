@@ -1,15 +1,40 @@
+var util = require('util');
+/**
+ * Load the config file
+ */
+var fs = require('fs');
+var configFile = 'config.json';
+try {
+  var config = JSON.parse(fs.readFileSync(configFile));
+} catch (err) {
+  console.log("Error with JSON.parse: " + err);
+}
+if (!config) {
+  console.log("Error loading: " + configFile);
+}
+if (typeof config === 'undefined' || typeof config.mysql === 'undefined' || typeof config.redis === 'undefined') {
+  console.log("Error with: " + configFile);
+}
+
 /**
  * Module dependencies
  */
-var app = express(),
-  expressValidator = require('express-validator'),
-  Notification = require('./lib/notification'),
-  redis = require("redis");
+var express = require('express');
+var app = express();
+var expressValidator = require('express-validator');
+var Notification = require('./lib/notification');
+var redis = require("redis");
+
+
+// *
+//  * The API-Key to validate against.
+
+// var API_KEY = 'foobar';
 
 /**
- * The redis client used to get/set session data.
+ * The redis client used to get/set API-Key data.
  */
-var redisSessionClient = redis.createClient();
+var redisSessionClient = redis.createClient(config.redisPort, config.redisHost);
 
 
 /**
@@ -18,15 +43,9 @@ var redisSessionClient = redis.createClient();
 var server = require('http').createServer(app); // create the express.js server
 
 /**
- * MYSQL Database
+ * Preemptively load the MYSQL Database
  */
-var dbConfig = {
-  host: process.env.MYSQL_HOST,
-  user: process.env.MYSQL_USER || 'nick',
-  password: process.env.MYSQL_PASS || 'testpassword000',
-  database: process.env.MYSQL_DATABASE || 'kdev';
-};
-var db = require('./lib/db')(dbConfig);
+var pool = require('./lib/mysql');
 
 /**
  * App configuration.
@@ -40,13 +59,9 @@ app.configure(function() {
 
   // make sure this is above the logger so to
   // not log all the server status messages
-  app.get("/server/status", function(req, res) {
-    return res.type('txt').send('online');
-  });
-
-  // make sure this is above the logger so to
-  // not log all the static asset requests
-  app.use(express.static(__dirname + '/public'));
+  // app.get("/server/status", function(req, res) {
+  //   return res.type('txt').send('online');
+  // });
 
   // log level depending on run mode
   if ('production' == process.env.NODE_ENV) {
@@ -59,11 +74,18 @@ app.configure(function() {
   app.use(express.bodyParser());
   app.use(expressValidator());
   app.use(express.methodOverride());
-  app.user(function(req, res, next){
-    // check the api-key header
-    if(!req.get('API-Key')) return res.json(401, {'API-Key not found'})
-    return next();
-  });
+  // app.user(function(req, res, next) {
+  //   // check the api-key header
+  //   if (!req.get('API-Key') || req.get('API-Key') !== API_KEY) {
+  //     return res.json(401, {
+  //       'API-Key not found'
+  //     });
+  //   }
+  //   return next();
+  // });
+
+  app.use(express.static(__dirname + '/public'));
+
   app.use(app.router);
 });
 
@@ -92,8 +114,7 @@ server.listen(app.get("port"), function() {
  *
  * @returns {JSON} Sends back the id of the created Notification in the response.
  */
-app.post('/notifications', function(req, res, next) {
-  // TODO: determine proper validations for this resource
+app.post('/notifications', validateNewNotification, function(req, res, next) {
 
   // save the object
   var n = new Notification(req.body);
@@ -101,7 +122,7 @@ app.post('/notifications', function(req, res, next) {
     if (err) return next(err);
 
     return res.json({
-      id: id
+      ID: id
     })
   });
 });
@@ -109,34 +130,32 @@ app.post('/notifications', function(req, res, next) {
 /**
  * Handle show Notification requests to the API.
  *           query params, ?=
- * @param {int} sessionID  The sessionID to run the query in the context of a user
- * @param {int} id The ID of the Notification to query.
+ * @param {int} ID The ID of the Notification to query.
  *
  *           function callback params
  * @param  {Object}   req  The request object express provides.
  * @param  {Object}   res  The response object express provides.
  * @param  {Function} next An optional callback to the next middleware.
  *
- * @returns {JSON} Sends back the Notifications matching the given id in the response.
+ * @returns {JSON} Sends back the Notification matching the given id in the response.
  */
-app.get('/notifications/:id', function(req, res, next) {
-  // TODO: determine proper validations for this resource
+app.get('/notifications/:ID', validateID, function(req, res, next) {
 
+  console.log("ID is: " + req.param('ID'));
   // get the object based on the id
-  var n = new Notification(req.body);
-  n.get(req.param('id'), function(err, results) {
+  var n = new Notification({
+    ID: req.param('ID')
+  });
+  n.get(function(err, result) {
     if (err) return next(err);
 
-    return res.json({
-      results: results
-    })
+    return res.json(result)
   });
 });
 
 /**
  * Handle index Notification requests to the API.
  *           query params, ?=
- * @param {int} sessionID  The sessionID to run the query in the context of a user
  * @param {int} start The offset to start the query, ie. for pagination. Default is 0.
  * @param {int} limit Limit the number of results returned. Default is 0.
  *
@@ -147,13 +166,18 @@ app.get('/notifications/:id', function(req, res, next) {
  *
  * @returns {JSON} Sends back the Notifications for the given user in the response.
  */
-app.get('/notifications', function(req, res, next) {
-  // TODO: determine proper validations for this resource
+app.get('/notifications', validateToUserID, function(req, res, next) {
 
-  if (!res.session) {
-    return res.json(401, {
-      message: "No session found."
-    });
+  // Validate start and limit as numbers
+  if (req.param('stfart')) {
+    res.assert('start').isNumeric();
+  }
+  if (req.param('limit')) {
+    res.assert('limit').isNumeric();
+  }
+  var errors = req.validationErrors();
+  if (errors) {
+    return res.json(400, errors);
   }
 
   var opts = {};
@@ -161,7 +185,9 @@ app.get('/notifications', function(req, res, next) {
   if (req.param('limit')) opts.limit = req.param('limit');
 
   // get all the notifications for the user
-  var n = new Notification(req.body);
+  var n = new Notification({
+    ToUserID: req.param('ToUserID')
+  });
   n.index(opts, function(err, results) {
     if (err) return next(err);
 
@@ -175,10 +201,7 @@ app.get('/notifications', function(req, res, next) {
 /**
  * Handle delete Notification requests to the API.
  *           query params, ?=
- * @param {int} sessionID  The sessionID to run the query in the context of a user
- * @param {int} start The offset to start the query, ie. for pagination. Default is 0.
- * @param {int} limit Limit the number of results returned. Default is 0.
- * @param {int} id The ID of the Notification to query.
+ * @param {int} ID The ID of the Notification to query.
  *
  *           function callback params
  * @param  {Object}   req  The request object express provides.
@@ -187,12 +210,13 @@ app.get('/notifications', function(req, res, next) {
  *
  * @returns {JSON} Sends back the number of rows deleted in the response.
  */
-app.delete('/notifications/:id', function(req, res, next) {
-  // TODO: determine proper validations for this resource
+app.del('/notifications/:ID', validateID, function(req, res, next) {
 
   // delete the notification based on the id
-  var n = new Notification(req.body);
-  n.get(req.param('id'), function(err, count) {
+  var n = new Notification({
+    ID: req.param('ID')
+  });
+  n.del(function(err, count) {
     if (err) return next(err);
 
     return res.json({
@@ -204,7 +228,7 @@ app.delete('/notifications/:id', function(req, res, next) {
 /**
  * Handle set Notification requests to the API.
  *           query params, ?=
- * @param {int} sessionID  The sessionID to run the query in the context of a user
+ * @param {int} ID The ID of the Notification to query.
  *
  *           function callback params
  * @param  {Object}   req  The request object express provides.
@@ -213,14 +237,16 @@ app.delete('/notifications/:id', function(req, res, next) {
  *
  * @returns {JSON} Sends back the number of Notifications updated in the response.
  */
-app.put('/notifications/:id', function(req, res, next) {
-  // TODO: determine proper validations for this resource
+app.put('/notifications/:ID', validateUpdateNotification, function(req, res, next) {
   //  a proper `PUT` would require all the params to be set,
   //  this resource acts more like a `PATCH`.
 
-  // get the object based on the id
-  var n = new Notification(req.body);
-  n.get(req.param('id'), function(err, count) {
+  var opts = _.extend(req.body, {
+    ID: req.param('ID')
+  });
+  // update the object based on the id
+  var n = new Notification(opts);
+  n.update(function(err, count) {
     if (err) return next(err);
 
     return res.json({
@@ -228,3 +254,80 @@ app.put('/notifications/:id', function(req, res, next) {
     })
   });
 });
+
+/**
+ * Validations for creating a Notification.
+ */
+
+function validateNewNotification(req, res, next) {
+  if (!req.body) req.body = {};
+
+  // Check for validation errors
+  req.checkBody('Type', 'Type must not be empty.').notEmpty();
+  req.checkBody('Page', 'Page must not be empty.').notEmpty();
+  req.checkBody('ToUserID', 'ToUserID must not be empty.').notEmpty();
+  req.checkBody('Description', 'Description must not be empty.').notEmpty();
+
+  var errors = req.validationErrors();
+  if (errors) {
+    return res.json(400, errors);
+  }
+  return next();
+}
+
+/**
+ * Validations for updating a Notification.
+ */
+
+function validateUpdateNotification(req, res, next) {
+  if (!req.body) req.body = {};
+
+  // Check for validation errors
+  if (req.body['Type']) {
+    req.checkBody('Type', 'Type must not be empty.').notEmpty();
+  }
+  if (req.body['Page']) {
+    req.checkBody('Page', 'Page must not be empty.').notEmpty();
+  }
+  if (req.body['ToUserID']) {
+    req.checkBody('ToUserID', 'ToUserID must not be empty.').notEmpty();
+  }
+  if (req.body['Description']) {
+    req.checkBody('Description', 'Description must not be empty.').notEmpty();
+  }
+
+  var errors = req.validationErrors();
+  if (errors) {
+    return res.json(400, errors);
+  }
+  return next();
+}
+
+/**
+ * Validations for the ID param.
+ */
+
+function validateID(req, res, next) {
+  req.assert('ID', 'ID must not be empty.').notEmpty();
+
+  var errors = req.validationErrors();
+  if (errors) {
+    return res.json(400, errors);
+  }
+
+  return next();
+}
+
+/**
+ * Validations for the ToUserID param.
+ */
+
+function validateToUserID(req, res, next) {
+  req.assert('ToUserID', 'ToUserID must not be empty.').notEmpty();
+
+  var errors = req.validationErrors();
+  if (errors) {
+    return res.json(400, errors);
+  }
+  return next();
+}
