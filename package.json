@@ -18,7 +18,8 @@
     "mysql": "~2.0.0-alpha9"
   },
   "scripts": {
-    "start": "app.js"
+    "start": "app.js",
+    "test": "mocha test/test.js"
   },
   "engines": {
     "node": "0.10.20"

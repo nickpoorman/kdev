@@ -46,7 +46,7 @@ client.on("ready", function(err) {
       console.log("Err: " + err);
       process.exit(1);
     }
-    console.log("Reply: " + reply);
+    console.log("Redis Reply: " + reply);
     client.quit()
   });
 });

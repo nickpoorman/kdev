@@ -107,6 +107,7 @@ connection.connect(function(err) {
             console.log("ERRROR: " + err);
             return process.exit(1);
           }
+          console.log("MYSQL Reply: " + 'OK');
 
           // DELETE
           //  - Delete the Notification from the database.

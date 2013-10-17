@@ -169,11 +169,11 @@ app.get('/notifications/:ID', validateID, function(req, res, next) {
 app.get('/notifications', validateToUserID, function(req, res, next) {
 
   // Validate start and limit as numbers
-  if (req.param('stfart')) {
-    res.assert('start').isNumeric();
+  if (req.param('start')) {
+    req.assert('start').isNumeric();
   }
   if (req.param('limit')) {
-    res.assert('limit').isNumeric();
+    req.assert('limit').isNumeric();
   }
   var errors = req.validationErrors();
   if (errors) {
@@ -191,9 +191,7 @@ app.get('/notifications', validateToUserID, function(req, res, next) {
   n.index(opts, function(err, results) {
     if (err) return next(err);
 
-    return res.json({
-      results: results
-    })
+    return res.json(results);
   });
 });
 
@@ -219,9 +217,7 @@ app.del('/notifications/:ID', validateID, function(req, res, next) {
   n.del(function(err, count) {
     if (err) return next(err);
 
-    return res.json({
-      count: count
-    })
+    return res.json(count)
   });
 });
 
