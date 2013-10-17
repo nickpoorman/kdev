@@ -24,6 +24,7 @@ var app = express();
 var expressValidator = require('express-validator');
 var Notification = require('./lib/notification');
 var redis = require("redis");
+var _ = require('underscore');
 
 
 // *
@@ -245,9 +246,7 @@ app.put('/notifications/:ID', validateUpdateNotification, function(req, res, nex
   n.update(function(err, count) {
     if (err) return next(err);
 
-    return res.json({
-      count: count
-    })
+    return res.json(count)
   });
 });
 
@@ -279,16 +278,16 @@ function validateUpdateNotification(req, res, next) {
   if (!req.body) req.body = {};
 
   // Check for validation errors
-  if (req.body['Type']) {
+  if (typeof req.body['Type'] !== 'undefined') {
     req.checkBody('Type', 'Type must not be empty.').notEmpty();
   }
-  if (req.body['Page']) {
+  if (typeof req.body['Page'] !== 'undefined') {
     req.checkBody('Page', 'Page must not be empty.').notEmpty();
   }
-  if (req.body['ToUserID']) {
+  if (typeof req.body['ToUserID'] !== 'undefined') {
     req.checkBody('ToUserID', 'ToUserID must not be empty.').notEmpty();
   }
-  if (req.body['Description']) {
+  if (typeof req.body['Description'] !== 'undefined') {
     req.checkBody('Description', 'Description must not be empty.').notEmpty();
   }
 
