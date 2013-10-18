@@ -52,6 +52,7 @@ var sockjs = require('sockjs');
 /**
  * Express web server configuration.
  */
+var express = require('express');
 var app = express();
 app.configure(function() {
   app.set('port', config.ioAPI.port || 4000);
@@ -86,12 +87,12 @@ app.get("/server/status", function(req, res) {
  * Create a redis connection for looking up sessions.
  */
 var redisSession = redis.createClient(config.redis.port, config.redis.host);
-client.on("error", function(err) {
+redisSession.on("error", function(err) {
   console.log("Error " + err);
   throw err;
 });
 
-client.on("ready", function(err) {
+redisSession.on("ready", function(err) {
   if (err) {
     console.log("Err: " + err);
     throw err;
@@ -255,11 +256,36 @@ sockjsServer.on('connection', function(conn) {
           case 'SEEN_NOTIFICATION':
             // send an update request to the server to mark the message as seen
             markNotificationAsSeen(fromUser.id, conn.session.userId, function(err, res) {
-              if (err) conn.send({
+              if (err) return conn.send({
                 type: 'ERROR',
                 code: 'SET_NOTIFICATION_SEEN_UNSUCCESSFUL',
+                message: 'API error',
                 request: message
               });
+              if (typeof res.affectedRows === 'undefined') {
+                return conn.send({
+                  type: 'ERROR',
+                  code: 'SET_NOTIFICATION_SEEN_UNSUCCESSFUL',
+                  message: 'affectedRows was undefined in response',
+                  request: message
+                });
+              }
+              if (res.affectedRows == 0) {
+                return conn.send({
+                  type: 'ERROR',
+                  code: 'SET_NOTIFICATION_SEEN_UNSUCCESSFUL',
+                  message: 'set was unsuccessful on notification with provided ID',
+                  request: message
+                });
+              }
+              if (res.affectedRows < 1) {
+                return conn.send({
+                  type: 'SUCCESS',
+                  code: 'SET_NOTIFICATION_SEEN_SUCCESSFUL',
+                  message: 'Notificat was successfully set as seen.',
+                  request: message
+                });
+              }
             });
             break;
           default:
@@ -277,9 +303,10 @@ sockjsServer.on('connection', function(conn) {
 
 function markNotificationAsSeen(notificationId, userId, cb) {
   // create a request to the rest API to mark the notification as seen
-  request.post('http://service.com/upload', {
+  request.post('http://' + config.httpAPI.host + ':' + config.httpAPI.port + '/' + notificationId, {
     form: {
-      key: 'value'
+      ToUserID: userId,
+      TimeViewed: Date.now
     }
   }, function(error, response, body) {
     if (error) return cb(error);

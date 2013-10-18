@@ -64,6 +64,7 @@ Valid codes:
 ```
 Valid codes: 
 * AUTH_SUCCESSFUL - the authorization process was successfully completed
+* SET_NOTIFICATION_SEEN_SUCCESSFUL - if setting a notification to seen was successful
 
 
 TODO: If an io-api client disconnects, automatically reconnect them.
