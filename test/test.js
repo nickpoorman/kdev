@@ -223,3 +223,73 @@ describe('put /notifications/:id', function() {
       });
   });
 });
+
+
+describe('put /notifications/:id/seen', function() {
+
+  var uri = '/notifications/';
+  var count = 3;
+
+  it('respond with json', function(done) {
+    request.put(uri + (count++) + '/seen')
+      .expect('Content-Type', /json/, done);
+  });
+
+  it('respond with the number of Notifications updated as 1', function(done) {
+    request.put(uri + (count++) + '/seen')
+      .send({
+        ToUserID: 1
+      })
+      .end(function(error, res) {
+        res.should.be.json
+        res.body.should.have.property('affectedRows')
+        res.body.should.have.property('insertId')
+        res.body.should.have.property('serverStatus')
+        res.body.should.have.property('warningCount')
+        res.body.should.have.property('message')
+        res.body.should.have.property('protocol41')
+        res.body.should.have.property('changedRows')
+        res.body.affectedRows.should.match(/^-?[0-9]+$/)
+        res.body.affectedRows.should.be.above(0)
+        done();
+      });
+  });
+  it('respond with the number of Notifications updated as 0 for bad Notification ID', function(done) {
+    request.put(uri + 0 + '/seen')
+      .send({
+        ToUserID: 1
+      })
+      .end(function(error, res) {
+        res.should.be.json
+        res.body.should.have.property('affectedRows')
+        res.body.should.have.property('insertId')
+        res.body.should.have.property('serverStatus')
+        res.body.should.have.property('warningCount')
+        res.body.should.have.property('message')
+        res.body.should.have.property('protocol41')
+        res.body.should.have.property('changedRows')
+        res.body.affectedRows.should.match(/^-?[0-9]+$/)
+        res.body.affectedRows.should.equal(0)
+        done();
+      });
+  });
+  it('respond with the number of Notifications updated as 0 for wrong ToUserID', function(done) {
+    request.put(uri + (count++) + '/seen')
+      .send({
+        ToUserID: 0
+      })
+      .end(function(error, res) {
+        res.should.be.json
+        res.body.should.have.property('affectedRows')
+        res.body.should.have.property('insertId')
+        res.body.should.have.property('serverStatus')
+        res.body.should.have.property('warningCount')
+        res.body.should.have.property('message')
+        res.body.should.have.property('protocol41')
+        res.body.should.have.property('changedRows')
+        res.body.affectedRows.should.match(/^-?[0-9]+$/)
+        res.body.affectedRows.should.equal(0)
+        done();
+      });
+  });
+});

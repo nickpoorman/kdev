@@ -208,6 +208,7 @@ sockjsServer.on('connection', function(conn) {
           //   subscribe: subscribe,
           // };
           // until this event fires, we are not actually ready
+          conn.isAuthed = true;
           return conn.write(JSON.stringify({
             type: 'SUCCESS',
             code: 'READY'
@@ -286,39 +287,40 @@ sockjsServer.on('connection', function(conn) {
             // send an update request to the server to mark the message as seen
             var notificationId = fromUser.id;
             markNotificationAsSeen(notificationId, conn.session.userId, function(err, res) {
-              if (err) return conn.send({
+              console.log("res: " + res);
+              if (err) return conn.write(JSON.stringify({
                 type: 'ERROR',
                 code: 'SET_NOTIFICATION_SEEN_UNSUCCESSFUL',
                 message: 'API error',
                 request: message,
                 id: notificationId
-              });
+              }));
               if (typeof res.affectedRows === 'undefined') {
-                return conn.send({
+                return conn.write(JSON.stringify({
                   type: 'ERROR',
                   code: 'SET_NOTIFICATION_SEEN_UNSUCCESSFUL',
                   message: 'affectedRows was undefined in response',
                   request: message,
                   id: notificationId
-                });
+                }));
               }
               if (res.affectedRows == 0) {
-                return conn.send({
+                return conn.write(JSON.stringify({
                   type: 'ERROR',
                   code: 'SET_NOTIFICATION_SEEN_UNSUCCESSFUL',
                   message: 'set was unsuccessful on notification with provided ID',
                   request: message,
                   id: notificationId
-                });
+                }));
               }
               if (res.affectedRows < 1) {
-                return conn.send({
+                return conn.write(JSON.stringify({
                   type: 'SUCCESS',
                   code: 'SET_NOTIFICATION_SEEN_SUCCESSFUL',
                   message: 'Notificat was successfully set as seen.',
                   request: message,
                   id: notificationId
-                });
+                }));
               }
             });
             break;
@@ -337,7 +339,7 @@ sockjsServer.on('connection', function(conn) {
 
 function markNotificationAsSeen(notificationId, userId, cb) {
   // create a request to the rest API to mark the notification as seen
-  request.post('http://' + config.httpAPI.host + ':' + config.httpAPI.port + '/' + notificationId, {
+  request.put('http://' + config.httpAPI.host + ':' + config.httpAPI.port + '/notifications/' + notificationId, {
     form: {
       ToUserID: userId,
       TimeViewed: Date.now

@@ -252,6 +252,34 @@ app.put('/notifications/:ID', validateUpdateNotification, function(req, res, nex
 });
 
 /**
+ * Handle marking Notification as seen requests to the API.
+ *           query params, ?=
+ * @param {int} ID The ID of the Notification to query.
+ *
+ *           function callback params
+ * @param  {Object}   req  The request object express provides.
+ * @param  {Object}   res  The response object express provides.
+ * @param  {Function} next An optional callback to the next middleware.
+ *
+ * @returns {JSON} Sends back the number of Notifications updated in the response.
+ */
+app.put('/notifications/:ID/seen', validateUpdateNotification, function(req, res, next) {
+  //  a proper `PUT` would require all the params to be set,
+  //  this resource acts more like a `PATCH`.
+
+  var opts = _.extend(req.body, {
+    ID: req.param('ID')
+  });
+  // update the object based on the id
+  var n = new Notification(opts);
+  n.seen(function(err, count) {
+    if (err) return next(err);
+
+    return res.json(count)
+  });
+});
+
+/**
  * Validations for creating a Notification.
  */
 
@@ -291,6 +319,23 @@ function validateUpdateNotification(req, res, next) {
   if (typeof req.body['Description'] !== 'undefined') {
     req.checkBody('Description', 'Description must not be empty.').notEmpty();
   }
+
+  var errors = req.validationErrors();
+  if (errors) {
+    return res.json(400, errors);
+  }
+  return next();
+}
+
+/**
+ * Validations for updating a Notification as seen.
+ */
+
+function validateSeenNotification(req, res, next) {
+  if (!req.body) req.body = {};
+
+  // Check for validation errors
+  req.checkBody('ToUserID', 'ToUserID must not be empty.').notEmpty();
 
   var errors = req.validationErrors();
   if (errors) {
