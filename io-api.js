@@ -287,7 +287,7 @@ sockjsServer.on('connection', function(conn) {
             // send an update request to the server to mark the message as seen
             var notificationId = fromUser.id;
             markNotificationAsSeen(notificationId, conn.session.userId, function(err, res) {
-              console.log("res: " + res);
+              console.log("res: " + util.inspect(res));
               if (err) return conn.write(JSON.stringify({
                 type: 'ERROR',
                 code: 'SET_NOTIFICATION_SEEN_UNSUCCESSFUL',
@@ -313,7 +313,7 @@ sockjsServer.on('connection', function(conn) {
                   id: notificationId
                 }));
               }
-              if (res.affectedRows < 1) {
+              if (res.affectedRows > 0) {
                 return conn.write(JSON.stringify({
                   type: 'SUCCESS',
                   code: 'SET_NOTIFICATION_SEEN_SUCCESSFUL',
@@ -339,11 +339,11 @@ sockjsServer.on('connection', function(conn) {
 
 function markNotificationAsSeen(notificationId, userId, cb) {
   // create a request to the rest API to mark the notification as seen
-  request.put('http://' + config.httpAPI.host + ':' + config.httpAPI.port + '/notifications/' + notificationId, {
+  request.put('http://' + config.httpAPI.host + ':' + config.httpAPI.port + '/notifications/' + notificationId + '/seen', {
     form: {
-      ToUserID: userId,
-      TimeViewed: Date.now
-    }
+      ToUserID: userId
+    },
+    json: true
   }, function(error, response, body) {
     if (error) return cb(error);
     return cb(null, body);
