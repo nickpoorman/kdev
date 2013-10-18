@@ -17,7 +17,9 @@
     "underscore": "~1.5.2",
     "mysql": "~2.0.0-alpha9",
     "sockjs": "~0.3.8",
-    "request": "~2.27.0"
+    "request": "~2.27.0",
+    "inherits": "~2.0.1",
+    "browserify": "~2.34.3"
   },
   "scripts": {
     "start": "app.js",

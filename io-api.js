@@ -1,3 +1,4 @@
+var util = require('util');
 /**
  * Read the config
  */
@@ -9,13 +10,16 @@ try {
   console.log("Error with JSON.parse: " + err);
 }
 if (!config) {
-  console.log("Error loading: " + configFile);
+  return console.log("Error loading: " + configFile);
 }
 if (typeof config === 'undefined' || typeof config.redis === 'undefined' || typeof config.ioAPI === 'undefined' || typeof config.httpAPI === 'undefined') {
-  console.log("Error with: " + configFile);
+  return console.log("Error with: " + configFile);
 }
 if (typeof config.httpAPI.host === 'undefined') {
-  console.log("Error with: " + configFile + '. Must specify httpAPI host.');
+  return console.log("Error with: " + configFile + '. Must specify httpAPI host.');
+}
+if (typeof config.sessionPrefix === 'undefined') {
+  config.sessionPrefix = "SESSION";
 }
 
 /**
@@ -43,13 +47,6 @@ var WHITELISTED_KEYS = [
 ];
 
 /**
- * Create the servers
- */
-var server = require('http').createServer(app); // create the express.js server
-var redis = require("redis");
-var sockjs = require('sockjs');
-
-/**
  * Express web server configuration.
  */
 var express = require('express');
@@ -62,8 +59,15 @@ app.configure(function() {
   app.use(express.compress());
   app.use(express.bodyParser());
   app.use(app.router);
-
+  app.use(express.static(__dirname + '/public'));
 });
+
+/**
+ * Create the servers
+ */
+var server = require('http').createServer(app); // create the express.js server
+var redis = require("redis");
+var sockjs = require('sockjs');
 
 /**
  * Tell express to start listening.
@@ -115,6 +119,10 @@ var sockjs_opts = {
 
 var sockjsServer = sockjs.createServer(sockjs_opts);
 
+sockjsServer.installHandlers(server, {
+  prefix: '/io'
+});
+
 sockjsServer.on('connection', function(conn) {
   conn.isAuthed = false;
   conn.firstMessage = true;
@@ -136,31 +144,46 @@ sockjsServer.on('connection', function(conn) {
 
       if (debug) console.log("fromUser: " + util.inspect(fromUser));
 
-      if (typeof fromUser.api_key === 'undefined' || typeof fromUser.sessionId === 'undefined') {
+      if (typeof fromUser.api_key === 'undefined' || typeof fromUser.session_id === 'undefined') {
         if (debug) console.log("was undefined");
         return conn.end();
       }
 
       // lookup the session in redis
-      redisSession.get(fromUser.sessionId, function(err, session) {
+      redisSession.get(config.sessionPrefix + ':' + fromUser.session_id, function(err, s) {
         if (err) {
           console.log("Err: " + err);
           return conn.end();
         }
-        if (!session) {
+        if (!s) {
           if (debug) console.log("Key is missing");
           // just end the connection here
           return conn.end();
         }
-        if (debug) console.log("Got session: " + session);
+        if (debug) console.log("Got session: " + s);
 
-        // check if the api_key we received from the user matches the one in the redis session store
-        if (typeof session.api_key === 'undefined' || typeof session.sessionId === 'undefined') {
-          // end the connection because we can't get the params
+        try {
+          var session = JSON.parse(s);
+        } catch (err) {
+          if (debug) console.log("Failed to parse session from Redis1");
           return conn.end();
         }
+        if (!session) {
+          if (debug) console.log("Failed to parse session from Redis2");
+          // just end the connection here
+          return conn.end();
+        }
+
+        // make sure the session we got from redis has the values we want
+        if (typeof session.api_key === 'undefined' || typeof session.session_id === 'undefined') {
+          // end the connection because we can't get the params
+          if (debug) console.log("Session property was undefined");
+          return conn.end();
+        }
+        // check if the api_key we received from the user matches the one in the redis session store
         if (session.api_key !== fromUser.api_key) {
           // disconnect them because they didn't give us the correct api_key
+          if (debug) console.log("session.api_key does not match fromUser.api_key: " + session.api_key + ':' + fromUser.api_key);
           return conn.end();
         }
 
@@ -184,6 +207,11 @@ sockjsServer.on('connection', function(conn) {
           // subscriptions[channelName] = {
           //   subscribe: subscribe,
           // };
+          // until this event fires, we are not actually ready
+          return conn.write(JSON.stringify({
+            type: 'SUCCESS',
+            code: 'READY'
+          }));
         });
 
         subscribe.on("message", function(channel, message) {
@@ -211,15 +239,16 @@ sockjsServer.on('connection', function(conn) {
               conn.write(JSON.stringify(_.pick(parsedMessage.body, WHITELISTED_KEYS)));
             }
           }
-
-          subscribe.subscribe(channelName);
-
-          // tell the client we are now ready
-          return conn.write({
-            type: 'SUCCESS',
-            code: 'AUTH_SUCCESSFUL'
-          });
         });
+        if (debug) console.log("doing subscribe");
+        subscribe.subscribe(channelName);
+        if (debug) console.log("subscribed");
+
+        // tell the client we are now ready
+        return conn.write(JSON.stringify({
+          type: 'SUCCESS',
+          code: 'AUTH_SUCCESSFUL'
+        }));
       });
     } else if (!conn.firstMessage && conn.isAuthed) {
       // do the parse of data here, ie. when a user clicks the message
@@ -234,40 +263,43 @@ sockjsServer.on('connection', function(conn) {
       } catch (err) {
         // let's log it because this shouldn't be happening
         console.log("ERROR: Got message with non parsable JSON. CHANNEL: " + channel + ' ' + redis.print(message));
-        return conn.write({
+        return conn.write(JSON.stringify({
           type: 'ERROR',
           code: 'INVALID_JSON',
           message: 'Invalid JSON.',
           request: message
-        });
+        }));
       }
       if (fromUser) {
         // the only thing we currently get is the id of a Notification to mark as seen
         if (typeof fromUser.type === 'undefined') {
           // return an error message
-          return conn.write({
+          return conn.write(JSON.stringify({
             type: 'ERROR',
             code: 'MISSING_TYPE',
             message: 'No message type was provided.',
             request: message
-          });
+          }));
         }
         switch (fromUser.type) {
           case 'SEEN_NOTIFICATION':
             // send an update request to the server to mark the message as seen
-            markNotificationAsSeen(fromUser.id, conn.session.userId, function(err, res) {
+            var notificationId = fromUser.id;
+            markNotificationAsSeen(notificationId, conn.session.userId, function(err, res) {
               if (err) return conn.send({
                 type: 'ERROR',
                 code: 'SET_NOTIFICATION_SEEN_UNSUCCESSFUL',
                 message: 'API error',
-                request: message
+                request: message,
+                id: notificationId
               });
               if (typeof res.affectedRows === 'undefined') {
                 return conn.send({
                   type: 'ERROR',
                   code: 'SET_NOTIFICATION_SEEN_UNSUCCESSFUL',
                   message: 'affectedRows was undefined in response',
-                  request: message
+                  request: message,
+                  id: notificationId
                 });
               }
               if (res.affectedRows == 0) {
@@ -275,7 +307,8 @@ sockjsServer.on('connection', function(conn) {
                   type: 'ERROR',
                   code: 'SET_NOTIFICATION_SEEN_UNSUCCESSFUL',
                   message: 'set was unsuccessful on notification with provided ID',
-                  request: message
+                  request: message,
+                  id: notificationId
                 });
               }
               if (res.affectedRows < 1) {
@@ -283,18 +316,19 @@ sockjsServer.on('connection', function(conn) {
                   type: 'SUCCESS',
                   code: 'SET_NOTIFICATION_SEEN_SUCCESSFUL',
                   message: 'Notificat was successfully set as seen.',
-                  request: message
+                  request: message,
+                  id: notificationId
                 });
               }
             });
             break;
           default:
-            return conn.write({
+            return conn.write(JSON.stringify({
               type: 'ERROR',
               code: 'INVALID_TYPE',
               message: 'Message type could not be identified.',
               request: message
-            });
+            }));
         }
       }
     }
