@@ -10,5 +10,15 @@
   "redis": {
     "host": "127.0.0.1",
     "port": 6379
+  },
+  "http-api": {
+    "host": "",
+    "port": 3000,
+    "debug": false
+  },
+  "io-api": {
+    "host": "",
+    "port": 4000,
+    "debug": false
   }
 }

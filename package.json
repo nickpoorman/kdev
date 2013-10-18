@@ -15,7 +15,9 @@
     "async": "~0.2.9",
     "jade": "~0.35.0",
     "underscore": "~1.5.2",
-    "mysql": "~2.0.0-alpha9"
+    "mysql": "~2.0.0-alpha9",
+    "sockjs": "~0.3.8",
+    "request": "~2.27.0"
   },
   "scripts": {
     "start": "app.js",

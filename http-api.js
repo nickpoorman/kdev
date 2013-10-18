@@ -12,8 +12,17 @@ try {
 if (!config) {
   console.log("Error loading: " + configFile);
 }
-if (typeof config === 'undefined' || typeof config.mysql === 'undefined' || typeof config.redis === 'undefined') {
+if (typeof config === 'undefined' || typeof config.mysql === 'undefined' || typeof config.redis === 'undefined' || typeof config.httpAPI === 'undefined') {
   console.log("Error with: " + configFile);
+}
+
+/**
+ * This debug variable controls the level of logging.
+ */
+var debug = false;
+if (typeof config.httpAPI.debug !== 'undefined') {
+  debug = config.httpAPI.debug;
+  process.env.debug = config.httpAPI.debug;
 }
 
 /**
@@ -53,37 +62,24 @@ var pool = require('./lib/mysql');
  */
 
 app.configure(function() {
-  app.set('port', process.env.PORT || 3000);
+  app.set('port', config.httpAPI.port || 3000);
   app.set("views", __dirname + "/views");
   app.set('views', __dirname);
   app.set('view engine', 'jade');
 
-  // make sure this is above the logger so to
-  // not log all the server status messages
-  // app.get("/server/status", function(req, res) {
-  //   return res.type('txt').send('online');
-  // });
-
   // log level depending on run mode
-  if ('production' == process.env.NODE_ENV) {
-    app.use(express.logger());
-  } else {
-    app.use(express.logger('dev'));
+  if (debug) {
+    if ('production' == process.env.NODE_ENV) {
+      app.use(express.logger());
+    } else {
+      app.use(express.logger('dev'));
+    }
   }
 
   app.use(express.compress());
   app.use(express.bodyParser());
   app.use(expressValidator());
   app.use(express.methodOverride());
-  // app.user(function(req, res, next) {
-  //   // check the api-key header
-  //   if (!req.get('API-Key') || req.get('API-Key') !== API_KEY) {
-  //     return res.json(401, {
-  //       'API-Key not found'
-  //     });
-  //   }
-  //   return next();
-  // });
 
   app.use(express.static(__dirname + '/public'));
 
@@ -98,9 +94,14 @@ server.listen(app.get("port"), function() {
 });
 
 /**
+ * Provide a resource to check if the server is online
+ */
+app.get("/server/status", function(req, res) {
+  return res.type('txt').send('online');
+});
+
+/**
  * HTTP Notifications API
- * All requests to the API should provide a `api-key` header
- *  to run the query in the context of a user.
  */
 
 /**
@@ -284,9 +285,9 @@ function validateUpdateNotification(req, res, next) {
   if (typeof req.body['Page'] !== 'undefined') {
     req.checkBody('Page', 'Page must not be empty.').notEmpty();
   }
-  if (typeof req.body['ToUserID'] !== 'undefined') {
-    req.checkBody('ToUserID', 'ToUserID must not be empty.').notEmpty();
-  }
+  // if (typeof req.body['ToUserID'] !== 'undefined') {
+  req.checkBody('ToUserID', 'ToUserID must not be empty.').notEmpty();
+  // }
   if (typeof req.body['Description'] !== 'undefined') {
     req.checkBody('Description', 'Description must not be empty.').notEmpty();
   }

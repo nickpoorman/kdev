@@ -25,7 +25,12 @@ describe('post /notifications', function() {
 
   it('respond with the id of the newly created Notification as a number', function(done) {
     request.post(uri)
-      .send({ Type: 'User', Page: 'Home', ToUserID: 1, Description: 'Hello there!' })
+      .send({
+        Type: 'User',
+        Page: 'Home',
+        ToUserID: 1,
+        Description: 'Hello there!'
+      })
       .end(function(error, res) {
         res.should.be.json
         res.body.should.have.property('ID')
@@ -166,7 +171,8 @@ describe('put /notifications/:id', function() {
   it('respond with the number of Notifications updated as 1', function(done) {
     request.put(uri)
       .send({
-        Type: 'Other'
+        Type: 'Other',
+        ToUserID: 1
       })
       .end(function(error, res) {
         res.should.be.json
@@ -184,6 +190,9 @@ describe('put /notifications/:id', function() {
   });
   it('respond with the number of Notifications updated as 0', function(done) {
     request.put(badURI + '/0')
+      .send({
+        ToUserID: 1
+      })
       .end(function(error, res) {
         res.should.be.json
         res.body.should.have.property('affectedRows')
@@ -201,7 +210,8 @@ describe('put /notifications/:id', function() {
   it('respond with an error message', function(done) {
     request.put(uri)
       .send({
-        Type: ''
+        Type: '',
+        ToUserID: 1
       })
       .end(function(error, res) {
         res.should.be.json
