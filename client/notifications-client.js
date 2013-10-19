@@ -62,6 +62,11 @@ function NotificationsClient(opts) {
         }
         self.emit('success', data);
         break;
+      case 'NEW_NOTIFICATION':
+      case 'DELETED_NOTIFICATION':
+      case 'UPDATED_NOTIFICATION':
+        self.emit('notification', data);
+        break;
       default:
         // if it's not an error or success what is it?
         self.emit('unknown', data);

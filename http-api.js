@@ -44,7 +44,19 @@ var _ = require('underscore');
 /**
  * The redis client used to get/set API-Key data.
  */
-var redisSessionClient = redis.createClient(config.redisPort, config.redisHost);
+var redisClient = redis.createClient(config.redis.port, config.redis.host);
+redisClient.on("error", function(err) {
+  console.log("Redis Client Error " + err);
+  throw err;
+});
+
+redisClient.on("ready", function(err) {
+  if (err) {
+    console.log("Redis Client Err: " + err);
+    throw err;
+  }
+  console.log("Redis ready......");
+});
 
 
 /**
@@ -122,6 +134,12 @@ app.post('/notifications', validateNewNotification, function(req, res, next) {
   var n = new Notification(req.body);
   n.create(function(err, id) {
     if (err) return next(err);
+
+    // publish the new notification to the user's channel
+    redisClient.publish(JSON.stringify({
+      type: 'NEW_NOTIFICATION',
+      notification: n.toObject()
+    }));
 
     return res.json({
       ID: id
@@ -210,14 +228,23 @@ app.get('/notifications', validateToUserID, function(req, res, next) {
  *
  * @returns {JSON} Sends back the number of rows deleted in the response.
  */
-app.del('/notifications/:ID', validateID, function(req, res, next) {
+app.del('/notifications/:ID', validateID, validateToUserID, function(req, res, next) {
 
+  var id = req.param('ID');
   // delete the notification based on the id
-  var n = new Notification({
-    ID: req.param('ID')
+  var opts = _.extend(req.body, {
+    ID: id
   });
+  var n = new Notification(opts);
   n.del(function(err, count) {
     if (err) return next(err);
+
+    // publish the deleted notification event to the user's channel
+    var channel = n.toObject().ToUserID;
+    redisClient.publish(JSON.stringify({
+      type: 'DELETED_NOTIFICATION',
+      id: id
+    }));
 
     return res.json(count)
   });
@@ -247,6 +274,13 @@ app.put('/notifications/:ID', validateUpdateNotification, function(req, res, nex
   n.update(function(err, count) {
     if (err) return next(err);
 
+    // publish the updated notification to the user's channel
+    var channel = n.toObject().ToUserID;
+    redisClient.publish(channel, JSON.stringify({
+      type: 'UPDATED_NOTIFICATION',
+      notification: n.toObject()
+    }));
+
     return res.json(count)
   });
 });
@@ -275,6 +309,12 @@ app.put('/notifications/:ID/seen', validateUpdateNotification, function(req, res
   n.seen(function(err, count) {
     if (err) return next(err);
 
+    // publish the updated notification to the user's channel
+    var channel = n.toObject().ToUserID;
+    redisClient.publish(channel, JSON.stringify({
+      type: 'UPDATED_NOTIFICATION',
+      notification: n.toObject()
+    }));
     return res.json(count)
   });
 });

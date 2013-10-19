@@ -23,6 +23,15 @@ if (typeof config.sessionPrefix === 'undefined') {
 }
 
 /**
+ * Logging
+ */
+var winston = require('winston');
+winston.add(winston.transports.File, {
+  filename: config.logfile || "/var/log/io-api.log"
+});
+winston.remove(winston.transports.Console);
+
+/**
  * This debug variable controls the level of logging.
  */
 var debug = false;
@@ -229,17 +238,22 @@ sockjsServer.on('connection', function(conn) {
             // do nothing
             return;
           }
-          if (parsedMessage) {
-            // handle the message here
-            // it could be coming from the API Server or from another io client
-            // currently it only comes from the API Server to send messages to the client
-            // but I don't know what the behavior would be if we sent a message
-            // I think it could loop back to us here
-            if (parsedMessage.to === 'client') {
-              if (debug) console.dir("doing write to client");
-              conn.write(JSON.stringify(_.pick(parsedMessage.body, WHITELISTED_KEYS)));
-            }
+          if (!parsedMessage) {
+            console.log("ERROR: Got an empty message. CHANNEL: " + channel + ' ' + redis.print(message));
+            // do nothing
+            return;
           }
+          // handle the message here
+          // it could be coming from the API Server or from another io client
+          // currently it only comes from the API Server to send messages to the client
+          // but I don't know what the behavior would be if we sent a message
+          // I think it could loop back to us here
+          
+          // I know this doesn't have to be parsed but in the future, 
+          // ie. if you wanted to filter what got sent to the server
+          // you can do that now because it's parsed.
+          conn.write(JSON.stringify(parsedMessage));
+
         });
         if (debug) console.log("doing subscribe");
         subscribe.subscribe(channelName);

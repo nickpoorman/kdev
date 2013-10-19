@@ -19,7 +19,8 @@
     "sockjs": "~0.3.8",
     "request": "~2.27.0",
     "inherits": "~2.0.1",
-    "browserify": "~2.34.3"
+    "browserify": "~2.34.3",
+    "winston": "~0.7.2"
   },
   "scripts": {
     "start": "app.js",

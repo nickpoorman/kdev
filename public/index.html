@@ -23,15 +23,43 @@
       console.log("Ready.");
 
       n.setViewed(3);
+      setTimeout(function(){
+        n.setViewed(4);
+      }, 4000);
     });
     n.on('error', function(evt){
+      console.log("error: ");
       console.log(evt);
     });
     n.on('success', function(evt){
+      console.log("success: ");
       console.log(evt);
+    });
+    n.on('notification', function(evt){
+      switch(evt.type){
+        case 'NEW_NOTIFICATION':
+          console.log("new notification: ");
+          console.log(evt);
+          break;
+        case 'DELETED_NOTIFICATION':
+          console.log("deleted notification: ");
+          console.log(evt);
+          break;
+        case 'UPDATED_NOTIFICATION':
+          console.log("updated notification: ");
+          console.log(evt);
+          if(typeof evt.notification.TimeViewed !== 'undefined'){
+            var id = evt.notification.ID;
+            $("[data-notification=" + id + "]").css("background-color", "green")
+          }
+          break;
+        defualt:
+          console.log('Unrecognized notification: ' + evt);
+      }
     });
     </script>
 </head>
 <body>
-  Test page
+  <div id="test-notification" style="background-color: red" data-notification="3">Test Notification Fast</div>
+  <div id="test-notification" style="background-color: red" data-notification="4">Test Notification Delay</div>
 </body>

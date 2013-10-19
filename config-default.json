@@ -20,5 +20,6 @@
     "host": "",
     "port": 4000,
     "debug": false
-  }
+  },
+  "logfile": "/var/log/io-api.log"
 }
