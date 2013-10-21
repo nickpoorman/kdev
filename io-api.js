@@ -1,4 +1,5 @@
 var util = require('util');
+var _ = require('underscore');
 /**
  * Read the config
  */
@@ -248,7 +249,7 @@ sockjsServer.on('connection', function(conn) {
           // currently it only comes from the API Server to send messages to the client
           // but I don't know what the behavior would be if we sent a message
           // I think it could loop back to us here
-          
+
           // I know this doesn't have to be parsed but in the future, 
           // ie. if you wanted to filter what got sent to the server
           // you can do that now because it's parsed.
@@ -331,11 +332,36 @@ sockjsServer.on('connection', function(conn) {
                 return conn.write(JSON.stringify({
                   type: 'SUCCESS',
                   code: 'SET_NOTIFICATION_SEEN_SUCCESSFUL',
-                  message: 'Notificat was successfully set as seen.',
+                  message: 'Notification was successfully set as seen.',
                   request: message,
                   id: notificationId
                 }));
               }
+            });
+            break;
+          case 'PULL_NOTIFICATIONS':
+            var filtered = _.pick(fromUser, ['start', 'limit', 'field', 'fieldValue']);
+            filtered = _.extend(filtered, {
+              ToUserID: conn.session.userId
+            });
+            pullNotifications(filtered, function(err, res) {
+              if (err) return conn.write(JSON.stringify({
+                type: 'ERROR',
+                code: 'PULL_NOTIFICATIONS_UNSUCCESSFUL',
+                message: 'API error',
+                request: message,
+                error: err
+              }));
+              // res is the body, should the notifications
+              // default limit is 10 so don't worry about it being to large
+              // the question here is should we send an event for each notification or just send them in bulk?
+              // ...lets send them in bulk
+              return conn.write(JSON.stringify({
+                type: 'PULLED_NOTIFICATIONS',
+                message: 'Notifications were successfully retrieved.',
+                request: message,
+                notifications: res
+              }));
             });
             break;
           default:
@@ -357,6 +383,17 @@ function markNotificationAsSeen(notificationId, userId, cb) {
     form: {
       ToUserID: userId
     },
+    json: true
+  }, function(error, response, body) {
+    if (error) return cb(error);
+    return cb(null, body);
+  });
+}
+
+function pullNotifications(opts, cb) {
+  // create a request to the rest API to mark the notification as seen
+  request.get('http://' + config.httpAPI.host + ':' + config.httpAPI.port + '/notifications', {
+    form: opts,
     json: true
   }, function(error, response, body) {
     if (error) return cb(error);

@@ -1,0 +1,1 @@
+browserify client/notifications-client.js > public/notifications-client.js

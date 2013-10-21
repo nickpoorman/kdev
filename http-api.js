@@ -136,7 +136,8 @@ app.post('/notifications', validateNewNotification, function(req, res, next) {
     if (err) return next(err);
 
     // publish the new notification to the user's channel
-    redisClient.publish(JSON.stringify({
+    var channel = n.toObject().ToUserID;
+    redisClient.publish(channel, JSON.stringify({
       type: 'NEW_NOTIFICATION',
       notification: n.toObject()
     }));
@@ -199,10 +200,15 @@ app.get('/notifications', validateToUserID, function(req, res, next) {
   if (errors) {
     return res.json(400, errors);
   }
+  // need to search on a bunch of values and build the search dynamically
 
   var opts = {};
   if (req.param('start')) opts.start = req.param('start');
   if (req.param('limit')) opts.limit = req.param('limit');
+  if (req.param('field') && req.param('fieldValue')) {
+    opts.field = req.param('field');
+    opts.fieldValue = req.param('fieldValue');
+  }
 
   // get all the notifications for the user
   var n = new Notification({
@@ -241,7 +247,7 @@ app.del('/notifications/:ID', validateID, validateToUserID, function(req, res, n
 
     // publish the deleted notification event to the user's channel
     var channel = n.toObject().ToUserID;
-    redisClient.publish(JSON.stringify({
+    redisClient.publish(channel, JSON.stringify({
       type: 'DELETED_NOTIFICATION',
       id: id
     }));

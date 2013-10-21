@@ -57,6 +57,10 @@
           console.log('Unrecognized notification: ' + evt);
       }
     });
+    n.on('notifications', function(evt){
+      console.log("notifications: ");
+      console.log(evt);
+    });
     </script>
 </head>
 <body>

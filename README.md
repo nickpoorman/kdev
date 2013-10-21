@@ -6,6 +6,8 @@ It has a config file called `config.json`.
 
 ##io-api
 
+Any event that comes in from the Redis channel (probably originating from the http-api) to the io-api gets passed along to the notifications-client through the sockjs connection.
+
 ###Auth with io-api
 
 First message to server must be an auth object:
@@ -48,7 +50,8 @@ This event shouldn't ever get sent to the browser client. It should only come fr
   type: 'ERROR',
   code: 'INVALID_JSON',
   message: 'A message here', 
-  request: '<optionally echo the request that was received>'
+  request: '<optionally echo the request that was received>',
+  error: <may or may not contain the error message, optional>
 }
 ```
 Valid codes: 
@@ -56,6 +59,7 @@ Valid codes:
 * MISSING_TYPE - the JSON object had no type associated with it
 * INVALID_TYPE - the JSON object had an invalid type associated with it
 * SET_NOTIFICATION_SEEN_UNSUCCESSFUL - if setting a notification to seen was unsuccessful, +{id: <the id of the notification>}
+* PULL_NOTIFICATIONS_UNSUCCESSFUL - if a request for notifications was unsuccessful, 
 
 ####Success message
 
@@ -111,6 +115,25 @@ Note: you might want to use `notification.ID` to update any notifications on the
 }
 ```
 
+####Pulled Notifications message (index)
+
+This message gets sent from the http-api to the io-api(s) and then to the clients when notifications are retrieved the http-api.
+
+If this fails it will emit an error with code: `PULL_NOTIFICATIONS_UNSUCCESSFUL`.
+
+`request` is the original request, so you know where what to update on the view.
+
+`notifications` contains the notifications retrieved.
+
+``` javascript
+{
+  type: 'PULLED_NOTIFICATIONS',
+  message: 'Notifications were successfully retrieved.',
+  request: message,
+  notifications: [<notifications>]
+}
+```
+
 ##Notifications Client
 
 The use the events the io-server passes around. There are some exceptions noted above. Obviously the client should never send an AUTH_SUCCESSFUL or other messages like it. If it does, the server ignores them.
@@ -121,16 +144,19 @@ The use the events the io-server passes around. There are some exceptions noted 
 The client will emit an authed event when it has been authenticated with the server. At this point it may not be safe to send messages to the server.
 
 ####client.on('ready', function(event))
-The client will emit a ready event when it has been authenticated with the server and is ready to begin receiving messages. It is only safe to send messages to the server after the ready event.
+The client will emit a `ready` event when it has been authenticated with the server and is ready to begin receiving messages. It is only safe to send messages to the server after the ready event.
 
 ####client.on('error', function(event))
-The client will emit an error event when it receives one from the server. Possible error event codes are listed above.
+The client will emit an `error` event when it receives one from the server. Possible error event codes are listed above.
 
 ####client.on('success', function(event))
-The client will emit a success event when it receives one from the server. Possible success event codes are listed above.
+The client will emit a `success` event when it receives one from the server. Possible success event codes are listed above.
 
 ####client.on('notification', function(event))
-The client will emit a notification event when it receives a message with type `*_NOTIFICATION` from the server.
+The client will emit a `notification` event when it receives a message with type `*_NOTIFICATION` from the server.
+
+####client.on('notifications', function(event))
+The client will emit a `notifications` event when it receives a message with type `PULLED_NOTIFICATIONS` from the server.
 
 TODO:
   * If an io-api client disconnects, automatically reconnect them.

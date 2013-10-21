@@ -68,6 +68,9 @@ function NotificationsClient(opts) {
       case 'UPDATED_NOTIFICATION':
         self.emit('notification', data);
         break;
+      case 'PULLED_NOTIFICATIONS':
+        self.emit('notifications', data)
+        break;
       default:
         // if it's not an error or success what is it?
         self.emit('unknown', data);
@@ -86,6 +89,20 @@ NotificationsClient.prototype.setViewed = function(id) {
     type: 'SEEN_NOTIFICATION',
     id: id
   }));
+}
+
+NotificationsClient.prototype.pull = function(opts) {
+  opts = opts || {};
+  var message = {
+    type: 'PULL_NOTIFICATIONS'
+  };
+  if (opts.limit) message.limit = opts.limit;
+  if (opts.start) message.start = opts.start;
+  if (opts.field && opts.fieldValue) {
+    message.field = opts.field;
+    message.fieldValue = opts.fieldValue;
+  }
+  this.sock.send(JSON.stringify(message));
 }
 },{"events":4,"inherits":2}],2:[function(require,module,exports){
 if (typeof Object.create === 'function') {
