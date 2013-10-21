@@ -214,3 +214,17 @@ Handle marking Notification as seen. This is practically the same thing as `put 
 
 PUT body must include:
   * `ToUserID` - this will act as the key to verify notification ownership of a user.
+
+
+To setup: [http://blog.dealspotapp.com/post/40184153657/node-js-production-deployment-with-nginx-varnish](http://blog.dealspotapp.com/post/40184153657/node-js-production-deployment-with-nginx-varnish)
+
+```
+$ cat /etc/monit/conf.d/regattable.conf 
+check host localhost with address 127.0.0.1
+        start "/sbin/start regattable"
+        stop "/sbin/stop regattable"
+        if failed port 3000 protocol HTTP
+                request /server/status
+                with timeout 5 seconds
+                then restart
+```
