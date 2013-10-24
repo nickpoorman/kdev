@@ -16,6 +16,10 @@ results
 npm-debug.log
 node_modules
 
+# Config file
+##############
+config.json
+
 # SublimeText project files #
 #############################
 *.sublime-project
