@@ -21,5 +21,9 @@
     "port": 4000,
     "debug": false
   },
-  "logfile": "/var/log/io-api.log"
+  "logfile": "/var/log/io-api.log",
+  "sessionPrefix": "SESSION",
+  "apiKeyVariable": "api-key",
+  "sessionIdVariable": "session-id",
+  "userIdVariable": "user-id"
 }

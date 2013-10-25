@@ -23,6 +23,22 @@ if (typeof config.sessionPrefix === 'undefined') {
   config.sessionPrefix = "SESSION";
 }
 
+if(typeof config.debug === 'undefined'){
+  config.debug = false;
+}
+
+if(typeof config.apiKeyVariable === 'undefined' || !config.apiKeyVariable){
+  config.apiKeyVariable = "api-key";
+}
+
+if(typeof config.sessionIdVariable === 'undefined' || !config.sessionIdVariable){
+  config.sessionIdVariable = "session-id";
+}
+
+if(typeof config.userIdVariable === 'undefined' || !config.userIdVariable){
+  config.userIdVariable = "user-id";
+}
+
 /**
  * Logging
  */
@@ -184,22 +200,24 @@ sockjsServer.on('connection', function(conn) {
           return conn.end();
         }
 
+        // config.apiKeyVariable
+        // config.sessionIdVariable
         // make sure the session we got from redis has the values we want
-        if (typeof session.api_key === 'undefined' || typeof session.session_id === 'undefined') {
+        if (typeof session[config.apiKeyVariable] === 'undefined' || typeof session[config.sessionIdVariable] === 'undefined') {
           // end the connection because we can't get the params
           if (debug) console.log("Session property was undefined");
           return conn.end();
         }
         // check if the api_key we received from the user matches the one in the redis session store
-        if (session.api_key !== fromUser.api_key) {
+        if (session[config.apiKeyVariable] !== fromUser.api_key) {
           // disconnect them because they didn't give us the correct api_key
-          if (debug) console.log("session.api_key does not match fromUser.api_key: " + session.api_key + ':' + fromUser.api_key);
+          if (debug) console.log("session.api_key does not match fromUser.api_key: " + session[config.apiKeyVariable] + ':' + fromUser.api_key);
           return conn.end();
         }
 
         // should only be here if they provided the correct api_key
         conn.session = session;
-        var channelName = session.userId; // TODO: figure out what this variable will actually be
+        var channelName = session[config.userIdVariable]; // TODO: figure out what this variable will actually be
 
         var subscribe = redis.createClient(config.redis.port, config.redis.host);
         // var publish = redis.createClient(config.redis.port, config.redis.host);
@@ -301,7 +319,7 @@ sockjsServer.on('connection', function(conn) {
           case 'SEEN_NOTIFICATION':
             // send an update request to the server to mark the message as seen
             var notificationId = fromUser.id;
-            markNotificationAsSeen(notificationId, conn.session.userId, function(err, res) {
+            markNotificationAsSeen(notificationId, conn.session[config.userIdVariable], function(err, res) {
               console.log("res: " + util.inspect(res));
               if (err) return conn.write(JSON.stringify({
                 type: 'ERROR',
@@ -342,7 +360,7 @@ sockjsServer.on('connection', function(conn) {
           case 'PULL_NOTIFICATIONS':
             var filtered = _.pick(fromUser, ['start', 'limit', 'field', 'fieldValue']);
             filtered = _.extend(filtered, {
-              ToUserID: conn.session.userId
+              ToUserID: conn.session[config.userIdVariable]
             });
             pullNotifications(filtered, function(err, res) {
               if (err) return conn.write(JSON.stringify({
