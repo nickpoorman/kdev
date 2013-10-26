@@ -13,7 +13,8 @@
     var n = new NotificationsClient({
       sockjs_url: 'http://127.0.0.1:4000/io',
       session_id: 'testsession_id',
-      api_key: 'testapi_key'
+      api_key: 'testapi_key',
+      debug: true
     });
     if(!n) console.log("Failed to create client");
     n.on('authed', function(evt){

@@ -1,7 +1,6 @@
 ;(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('inherits');
-var debug = true;
 
 window.NotificationsClient = NotificationsClient;
 
@@ -9,20 +8,59 @@ function NotificationsClient(opts) {
   if (!(this instanceof NotificationsClient)) return new NotificationsClient(opts);
   if (!opts) opts = {};
 
-  if (!opts.sockjs_url || !opts.session_id || !opts.api_key) return null;
+  if (!opts.sockjs_url || !opts.session_id || !opts.api_key) throw new Error('requires valid options for "sockjs_url", "session_id", "api_key"');
 
+  this.opts = opts;
+
+  this.reconnectInterval = null;
+  this._reconnectAttempts = 0;
+  this.reconnectAttempts = opts.reconnectAttempts || 10;
+  this.forceReload = opts.forceReload || false;
+  this.debug = opts.debug || false;
+
+  if (self.debug) console.log("created Notification Client");
+  this.createConnection();
+
+}
+
+inherits(NotificationsClient, EventEmitter);
+
+NotificationsClient.prototype.setViewed = function(id) {
+  this.sock.send(JSON.stringify({
+    type: 'SEEN_NOTIFICATION',
+    id: id
+  }));
+}
+
+NotificationsClient.prototype.pull = function(opts) {
+  opts = opts || {};
+  var message = {
+    type: 'PULL_NOTIFICATIONS'
+  };
+  if (opts.limit) message.limit = opts.limit;
+  if (opts.start) message.start = opts.start;
+  if (opts.field && opts.fieldValue) {
+    message.field = opts.field;
+    message.fieldValue = opts.fieldValue;
+  }
+  this.sock.send(JSON.stringify(message));
+}
+
+NotificationsClient.prototype.createConnection = function() {
+  if (this.debug) console.log("_reconnectAttempts: " + this._reconnectAttempts);
+  if (this.debug) console.log("reconnectAttempts: " + this.reconnectAttempts);
+  if (this.debug) console.log("Create Connection");
   var self = this;
 
-  console.log("created Notification Client");
-
-  this.sock = new SockJS(opts.sockjs_url);
+  this.sock = new SockJS(self.opts.sockjs_url);
 
   this.sock.onopen = function() {
-    if (debug) console.log("Connected");
-    if (debug) console.log("Sending Auth...");
+    if (self.debug) console.log("Connected");
+    self._reconnectAttempts = 0;
+    if (self.debug) console.log("Sending Auth...");
     self.sock.send(JSON.stringify({
-      session_id: opts.session_id,
-      api_key: opts.api_key
+      session_id: self.opts.session_id,
+      api_key: self.opts.api_key
     }));
   };
 
@@ -30,20 +68,22 @@ function NotificationsClient(opts) {
    * message.data contains the json sent from the server
    */
   this.sock.onmessage = function(message) {
-    if (debug) console.log(message);
+    if (self.debug) console.log(message);
 
     if (!message || typeof message.data === 'undefined') {
-      return console.log("Error parsing JSON from server.");
+      if (self.debug) console.log("Error parsing JSON from server.");
+      return;
     }
     var data = '';
     try {
       data = JSON.parse(message.data);
     } catch (err) {
-      return console.log("Error parsing JSON from server.");
+      if (self.debug) console.log("Error parsing JSON from server.");
+      return;
     }
 
     if (!data) {
-      console.log("No data from server.");
+      if (self.debug) console.log("No data from server.");
       return;
     }
 
@@ -78,31 +118,24 @@ function NotificationsClient(opts) {
   };
 
   this.sock.onclose = function() {
-    console.log('Disconnected');
+    if (self.debug) console.log('Disconnected');
+
+    if (self._reconnectAttempts < self.reconnectAttempts) {
+      self.reconnectInterval = setTimeout(function() {
+        if (self.debug) console.log("trying to reconnect");
+        self.createConnection();
+      }, 1500 + ((self._reconnectAttempts++) * 500));
+    } else {
+      // should probably refresh the page if reconnecting isn't working.
+      // there might be a new client that needs to be pulled.
+      if (self.debug) console.log("Done trying to reconnect.");
+      if (self.forceReload) {
+        if (self.debug) console.log("Going to reload the page.");
+        window.location.reload(true);
+      }
+    }
+
   };
-}
-
-inherits(NotificationsClient, EventEmitter);
-
-NotificationsClient.prototype.setViewed = function(id) {
-  this.sock.send(JSON.stringify({
-    type: 'SEEN_NOTIFICATION',
-    id: id
-  }));
-}
-
-NotificationsClient.prototype.pull = function(opts) {
-  opts = opts || {};
-  var message = {
-    type: 'PULL_NOTIFICATIONS'
-  };
-  if (opts.limit) message.limit = opts.limit;
-  if (opts.start) message.start = opts.start;
-  if (opts.field && opts.fieldValue) {
-    message.field = opts.field;
-    message.fieldValue = opts.fieldValue;
-  }
-  this.sock.send(JSON.stringify(message));
 }
 },{"events":4,"inherits":2}],2:[function(require,module,exports){
 if (typeof Object.create === 'function') {

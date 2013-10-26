@@ -138,6 +138,33 @@ If this fails it will emit an error with code: `PULL_NOTIFICATIONS_UNSUCCESSFUL`
 
 The use the events the io-server passes around. There are some exceptions noted above. Obviously the client should never send an AUTH_SUCCESSFUL or other messages like it. If it does, the server ignores them.
 
+###Methods
+
+####var c = new Notifications(opts)
+Create a new notification client that will automatically try to connect to the io-server. `opts` takes the following params:
+
+ * `opts.sockjs_url` - The url to the io-api.
+ * `opts.session_id` - The session id of the user.
+ * `opts.api_key` - The api key of the user.
+ * `opts.reconnectAttempts` - The number of times to reconnect if the client disconnects from the server. Default `10`.
+ * `opts.forceReload` - A boolean value to force a reload of the page if the number of reconnect attempts is exceeded. Default: `false`.
+ * `opts.debug` - Print debug messages to the client. Default: `false`.
+
+####client.createConnection()
+Create a new connection to the io-api. This will automatically try to reconnect.
+
+####client.pull(opts)
+This method will pull all the notifications. You may provide an the `opts` parameter to specify exactly what to load.
+
+  * `opts.start` - the offset to start from. Default `0`.
+  * `opts.limit` - the limit on the number of results returned. Default: `10`.
+   `opts.field` - the field to limit the results to. ie. 'Page'
+  * `opts.fieldValue` - the value to limit the results to with the field.
+
+####client.setViewed(id)
+Set a notification as viewed. `id` is the id of the notification to set as viewed. This simply sets a time for TimeViewed in the database.
+
+
 ###Events
 
 ####client.on('authed', function(event))
