@@ -99,6 +99,17 @@ describe('get /notifications', function() {
         done();
       });
   });
+    it('respond with a Notification including a property ID', function(done) {
+    request.get(uri)
+      .send({
+        ToUserID: 1,
+        limit: 1
+      })
+      .end(function(error, res) {
+        res.body[0].should.have.property('ID')
+        done();
+      });
+  });
 });
 
 describe('delete /notifications/:id', function() {

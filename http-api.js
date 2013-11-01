@@ -139,7 +139,9 @@ app.post('/notifications', validateNewNotification, function(req, res, next) {
     var channel = n.toObject().ToUserID;
     redisClient.publish(channel, JSON.stringify({
       type: 'NEW_NOTIFICATION',
-      notification: n.toObject()
+      notification: _.extend(n.toObject(), {
+        ID: id
+      })
     }));
 
     return res.json({
@@ -234,7 +236,7 @@ app.get('/notifications', validateToUserID, function(req, res, next) {
  *
  * @returns {JSON} Sends back the number of rows deleted in the response.
  */
-app.del('/notifications/:ID', validateID, validateToUserID, function(req, res, next) {
+app.del('/notifications/:ID', validateID, function(req, res, next) {
 
   var id = req.param('ID');
   // delete the notification based on the id
